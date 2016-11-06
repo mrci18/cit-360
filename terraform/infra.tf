@@ -49,7 +49,7 @@ resource "aws_nat_gateway" "nat" {
 resource "aws_route_table" "public_routing_table" {
     vpc_id = "${aws_vpc.vpc_test.id}"
     route {
-        cidr_block = "10.31.0.0/24"
+        cidr_block = "10.31.1.0/24"
         gateway_id = "${aws_internet_gateway.gw.id}"
     }
 
@@ -78,8 +78,8 @@ resource "aws_route" "private" {
 
 #Create public subnet us-west-2a
 resource "aws_subnet" "public_subnet_a" {
-    vpc_id = "${var.vpc_id}"
-    cidr_block = "172.31.0.1/24"
+    vpc_id = "${aws_vpc.vpc_test.id}"
+    cidr_block = "172.31.1.0/24"
     map_public_ip_on_launch = true
     availability_zone = "us-west-2a"
 
@@ -90,8 +90,8 @@ resource "aws_subnet" "public_subnet_a" {
 
 #Create public subnet us-west-2b
 resource "aws_subnet" "public_subnet_b" {
-    vpc_id = "${var.vpc_id}"
-    cidr_block = "172.31.1.2/24"
+    vpc_id = "${aws_vpc.vpc_test.id}"
+    cidr_block = "172.31.2.0/24"
     map_public_ip_on_launch = true
     availability_zone = "us-west-2b"
 
@@ -102,8 +102,8 @@ resource "aws_subnet" "public_subnet_b" {
 
 #Create public subnet us-west-2c
 resource "aws_subnet" "public_subnet_c" {
-    vpc_id = "${var.vpc_id}"
-    cidr_block = "172.31.1.3/24"
+    vpc_id = "${aws_vpc.vpc_test.id}"
+    cidr_block = "172.31.3.0/24"
     map_public_ip_on_launch = true
     availability_zone = "us-west-2c"
 
@@ -116,8 +116,8 @@ resource "aws_subnet" "public_subnet_c" {
 #Public subnets should /22 inside VPR CIDR space
 #Private subnet uses NAT Gateway in its routing table for the default route
 resource "aws_subnet" "private_subnet_a" {
-    vpc_id = "${var.vpc_id}"
-    cidr_block = "172.31.4.1/22"
+    vpc_id = "${aws_vpc.vpc_test.id}"
+    cidr_block = "172.31.5.0/22"
     availability_zone = "us-west-2a"
 
     tags {
@@ -127,8 +127,8 @@ resource "aws_subnet" "private_subnet_a" {
 
 #Create private subnet us-west-2b
 resource "aws_subnet" "private_subnet_b" {
-    vpc_id = "${var.vpc_id}"
-    cidr_block = "172.31.4.2/22"
+    vpc_id = "${aws_vpc.vpc_test.id}"
+    cidr_block = "172.31.8.0/22"
     availability_zone = "us-west-2b"
 
     tags {
@@ -138,8 +138,8 @@ resource "aws_subnet" "private_subnet_b" {
 
 #Create private subnet us-west-2c
 resource "aws_subnet" "private_subnet_c" {
-    vpc_id = "${var.vpc_id}"
-    cidr_block = "172.31.4.3/22"
+    vpc_id = "${aws_vpc.vpc_test.id}"
+    cidr_block = "172.31.12.0/22"
     availability_zone = "us-west-2c"
 
     tags {
@@ -155,12 +155,48 @@ resource "aws_security_group" "allow_all" {
     ingress {
         from_port = 0
         to_port = 22
-        protocol = "-1"
+        protocol = "tcp"
     }
 
     tags {
         Name = "allow_all"
     }
+}
+
+#Assciate public_a to public route table
+resource "aws_route_table_association" "public_subnet_a_rt_assoc" {
+    subnet_id = "${aws_subnet.public_subnet_a.id}"
+    route_table_id = "${aws_route_table.public_routing_table.id}"
+}
+
+#Assciate public_b to public route table
+resource "aws_route_table_association" "public_subnet_b_rt_assoc" {
+    subnet_id = "${aws_subnet.public_subnet_b.id}"
+    route_table_id = "${aws_route_table.public_routing_table.id}"
+}
+
+#Assciate public_c to public route table
+resource "aws_route_table_association" "public_subnet_c_rt_assoc" {
+    subnet_id = "${aws_subnet.public_subnet_c.id}"
+    route_table_id = "${aws_route_table.public_routing_table.id}"
+}
+
+#Assciate private_a to private route table
+resource "aws_route_table_association" "private_subnet_a_rt_assoc" {
+    subnet_id = "${aws_subnet.private_subnet_a.id}"
+    route_table_id = "${aws_route_table.private_routing_table.id}"
+}
+
+#Assciate private_b to private route table
+resource "aws_route_table_association" "private_subnet_b_rt_assoc" {
+    subnet_id = "${aws_subnet.private_subnet_b.id}"
+    route_table_id = "${aws_route_table.private_routing_table.id}"
+}
+
+#Assciate private_c to private route table
+resource "aws_route_table_association" "private_subnet_c_rt_assoc" {
+    subnet_id = "${aws_subnet.private_subnet_c.id}"
+    route_table_id = "${aws_route_table.private_routing_table.id}"
 }
 
 
