@@ -1,3 +1,22 @@
+#VPC ID to default below
+variable "vpc_id" {
+    description = "VPC ID for usage throughout the build process"
+    default = "vpc-a3a841c4"
+}
+
+#AWS Region default
+variable "aws_region" {
+    description = "EC2 Region for the VPC"
+    default = "us-west-2"
+}
+
+#AMI default 
+variable "amis" {
+    description = "AMI"
+    default = "ami-5ec1673e" #Amazon Linux AMI 2016.09.0 HVM (SSD) EBS-Backed 64-bit
+}
+
+//Create instance
 resource "aws_instance" "web" {
     ami = "${var.amis}"
     instance_type = "t2.micro"
