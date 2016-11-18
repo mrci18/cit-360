@@ -175,6 +175,9 @@ resource "aws_security_group" "allow_all" {
         from_port = 0
         to_port = 22
         protocol = "tcp"
+	cidr_blocks = [
+		"172.31.0.0/16",
+	]
     }
 
     tags {
@@ -217,5 +220,36 @@ resource "aws_route_table_association" "private_subnet_c_rt_assoc" {
     subnet_id = "${aws_subnet.private_subnet_c.id}"
     route_table_id = "${aws_route_table.private_routing_table.id}"
 }
+
+#Create DB subnet group
+resource "aws_db_subnet_group" "default" {
+    name = "main"
+    subnet_ids = ["${aws_subnet.private_subnet_a.id}", "${aws_subnet.private_subnet_b.id}"]
+    tags {
+        Name = "My DB subnet group"
+    }
+}
+
+#Create a relational database service (RDS) instance
+resource "aws_db_instance" "default" {
+    allocated_storage    = 5
+    engine               = "mariadb"
+    engine_version       = "10.0.24"
+    instance_class       = "db.t2.micro"
+    multi_az             = "No"  
+    storage_type         = "gp2"
+    name                 = "mariadb"
+    username             = "mrci18"
+    password             = "${var.RDS_Key}"
+    db_subnet_group_name = "my_database_subnet_group"
+    parameter_group_name = "default.mariadb10"
+}
+
+
+
+The DB should not be publically accessible and will only allow access from inside your VPC
+Instance identifier, master username and master password are all up to you.
+You password should be an input variable added using the “-var” flag. See https://www.terraform.io/intro/getting-started/variables.html
+Make sure to give your instance a name tag as well
 
 
