@@ -16,7 +16,7 @@ variable "amis" {
     default = "ami-5ec1673e" #Amazon Linux AMI 2016.09.0 HVM (SSD) EBS-Backed 64-bit
 }
 
-//Create instance
+#Create instance
 resource "aws_instance" "web" {
     ami = "${var.amis}"
     instance_type = "t2.micro"
@@ -245,11 +245,114 @@ resource "aws_db_instance" "default" {
     parameter_group_name = "default.mariadb10"
 }
 
+#Create a security group with port 80 ingress and port 22 ingress from the cidr network of the VPC
+resource "aws_security_group" "allow_all" {
+    name = "allow_all"
+    description = "Allow all inbound traffic"
+
+    ingress {
+        from_port = 0
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["172.31.0.0/16"]
+    }
+
+    ingress {
+        from_port = 0
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = ["172.31.0.0/16"]
+    }
+
+}
+
+#Create a new security group for the ELB
+resource "aws_security_group" "allow_all" {
+    name = "allow_all"
+    description = "Allow all inbound traffic"
+
+    ingress {
+        from_port = 0
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+}
+
+#Create a new load balancer
+resource "aws_elb" "bar" {
+    name = "foobar-terraform-elb"
+    availability_zones = ["us-west-2b", "us-west-2c"]
+
+    access_logs {
+      bucket = "foo"
+      bucket_prefix = "bar"
+      interval = 60
+    }
+
+    listener {
+      instance_port = 80
+      instance_protocol = "http"
+      lb_port = 80
+      lb_protocol = "http"
+    }
+
+    health_check {
+      healthy_threshold = 2
+      unhealthy_threshold = 2
+      timeout = 5
+      target = "HTTP:80/"
+      interval = 30
+    }
+
+    instances = ["${aws_instance.foo.id}"]
+    cross_zone_load_balancing = true
+    idle_timeout = 60
+    connection_draining = true
+    connection_draining_timeout = 60
+
+    tags {
+      Name = "elb"
+    }
+}
+
+#Create first instance that will run the web service
+resource "aws_instance" "web1" {
+    ami = "${var.amis}"
+    instance_type = "t2.micro"
+    tags {
+        Name = "webserver-b"
+        
+        Service = "curriculum"
+    }
+}
+
+#Create second instance that will run the web service
+resource "aws_instance" "web" {
+    ami = "${var.amis}"
+    instance_type = "t2.micro"
+    tags {
+        Name = "webserver-c"
+
+        Service = "curriculum"
+    }
+}
 
 
-The DB should not be publically accessible and will only allow access from inside your VPC
-Instance identifier, master username and master password are all up to you.
-You password should be an input variable added using the “-var” flag. See https://www.terraform.io/intro/getting-started/variables.html
-Make sure to give your instance a name tag as well
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
