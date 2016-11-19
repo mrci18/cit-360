@@ -10,6 +10,18 @@ variable "aws_region" {
     default = "us-west-2"
 }
 
+#AWS Region for the first instance that will run the web service
+variable "aws_region_us-west-2b" {
+    description = "us-west-2b"
+    default = "us-west-2b"
+}
+
+#AWS Region for the second instance that will run the web service
+variable "aws_region_us-west-2c" {
+    description = "us-west-2b"
+    default = "us-west-2c"
+}
+
 #AMI default 
 variable "amis" {
     description = "AMI"
@@ -267,8 +279,8 @@ resource "aws_security_group" "allow_all" {
 }
 
 #Create a new security group for the ELB
-resource "aws_security_group" "allow_all" {
-    name = "allow_all"
+resource "aws_security_group" "elb_security_group" {
+    name = "elb_security_group"
     description = "Allow all inbound traffic"
 
     ingress {
@@ -280,14 +292,14 @@ resource "aws_security_group" "allow_all" {
 
 }
 
-#Create a new load balancer
-resource "aws_elb" "bar" {
+#Create a new elastic load balancer (ELB)
+resource "aws_elb" "elb" {
     name = "foobar-terraform-elb"
     availability_zones = ["us-west-2b", "us-west-2c"]
 
     access_logs {
-      bucket = "foo"
-      bucket_prefix = "bar"
+      bucket = "aws_elb"
+      bucket_prefix = "elb"
       interval = 60
     }
 
@@ -305,8 +317,16 @@ resource "aws_elb" "bar" {
       target = "HTTP:80/"
       interval = 30
     }
+    
+    security_groups = ["${aws_security_group.elb_security_group}"]
 
-    instances = ["${aws_instance.foo.id}"]
+    instances = ["${aws_instance.webserver-b.id}"]
+    cross_zone_load_balancing = true
+    idle_timeout = 60
+    connection_draining = true
+    connection_draining_timeout = 60
+
+    instances = ["${aws_instance.webserver-c.id}"]
     cross_zone_load_balancing = true
     idle_timeout = 60
     connection_draining = true
@@ -318,8 +338,9 @@ resource "aws_elb" "bar" {
 }
 
 #Create first instance that will run the web service
-resource "aws_instance" "web1" {
+resource "aws_instance" "webserver-b" {
     ami = "${var.amis}"
+    region = "${var.aws_region_us-west-2b}"
     instance_type = "t2.micro"
     tags {
         Name = "webserver-b"
@@ -329,8 +350,9 @@ resource "aws_instance" "web1" {
 }
 
 #Create second instance that will run the web service
-resource "aws_instance" "web" {
+resource "aws_instance" "webserver-c" {
     ami = "${var.amis}"
+    region = "${var.aws_region_us-west-2c}"    
     instance_type = "t2.micro"
     tags {
         Name = "webserver-c"
