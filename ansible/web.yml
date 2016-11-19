@@ -1,73 +1,91 @@
 ---
 - hosts: web
   vars:
-    db_password: password
     server_name: curriculum
     service_name: curriculum
     service_version: 1.0
-    app_key: QujjaJs3fxwtnTl7FiqhEEn1ACkf7YZW
     app_env: test
     db_host: localhost
     db_database: curriculum
     db_username: curriculum
     db_port: 3306
     service_dir: /usr/share/nginx/{{ service_name }}
-  tasks:
-    - become: yes
-      lineinfile: dest=/etc/sysconfig/selinux regexp="^SELINUX=" line="SELINUX=permissive"
+  vars_files:
+    - secret.yml
 
-    - become: yes
+  tasks:
+    - name: Ensure a particular line is in a file
+      become: yes
+      lineinfile: dest=/etc/sysconfig/selinux regexp="^SELINUX=" line="SELINUX=permissive"
+    
+    - name: Put SELinux in permissive mode
+      become: yes
       command: setenforce 0
 
-    - become: yes
+    - name: Install Epel-Release
+      become: yes
       yum: name=epel-release update_cache=yes state=present
 
-    - become: yes
+    - name: Install Nginx, php, php-fpm, php-ldap,php-mbstring,php-mcrypt,php-mysql,php-phpunit-PHPUnit
+      become: yes
       yum: name=nginx,php,php-fpm,php-ldap,php-mbstring,php-mcrypt,php-mysql,php-phpunit-PHPUnit update_cache=yes state=present
       register: nginx_install
+      
+    - name: Install composer
+      become: yes
+      shell: get_url -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-    - become: yes
-      shell: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-    - become: yes
-      copy: src=web/nginx.conf dest=/etc/nginx/nginx.conf mode=0000
+    - name: Copy nginx.conf to /etc/nginx/nginx.conf/
+      become: yes
+      copy: src=web/nginx.conf dest=/etc/nginx/nginx.conf mode=0640
       register: nginx_conf
 
-    - become: yes
+    - name: Set vhost_conf to /etc/nginx/conf.d/
+      become: yes
       template: src=web/vhost.conf.j2 dest=/etc/nginx/conf.d/{{ service_name }}.conf mode=0644
       register: vhost_conf
 
-    - become: yes
+    - name: Set php_conf to /etc/php.ini/
+      become: yes
       template: src=web/php.ini.j2 dest=/etc/php.ini mode=0644
       register: php_conf
 
-    - become: yes
+    - name: Copy php_fpm_conf to /etc/php-fpm.d//www.conf/
+      become: yes
       copy: src=web/php-fpm-web.conf dest=/etc/php-fpm.d/www.conf mode=0644
       register: php_fpm_conf
 
-    - become: yes
-      systemd: name=nginx state=restarted enabled=yes
+    - name: Restart Ngnix if  either nginx_conf/vhost_conf are changed
+      become: yes
+      service: name=nginx state=restarted enabled=yes
       when: nginx_install|changed or nginx_conf|changed or vhost_conf|changed
 
-    - become: yes
-      systemd: name=php-fpm state=restarted enabled=yes
+    - name: Restart Ngnix after install or either php_conf/php_fpm are changed
+      become: yes
+      service: name=php-fpm state=restarted enabled=yes
       when: nginx_install|changed or php_conf|changed or php_fpm_conf|changed
 
-    - become: yes
+    - name: Create directory unless it doesn't exists
+      become: yes
       file: path="{{ service_dir }}" state=directory
 
-    - become: yes
+    - name: Unpack tar file
+      become: yes
       unarchive: src=web/{{ service_name }}.tgz dest="{{ service_dir }}" mode=0755
 
-    - become: yes
+    - name: Update and change directory
+      become: yes
       command: /usr/local/bin/composer update chdir={{ service_dir }}
 
-    - become: yes
-      command: chmod -R 0777 storage chdir="{{ service_dir }}"
+    - name: Change permission 0777
+      become: yes
+      shell: chdir="{{ service_dir }}" mode=0777
 
-    - become: yes
+    - name: Change owner
+      become: yes 
       command: chown -R nginx:nginx . chdir="{{ service_dir }}"
 
-    - become: yes
+    - name: Template Env.j2 
+      become: yes
       template: src=web/env.j2 dest="{{ service_dir }}/.env" mode=0644 owner=nginx
 
