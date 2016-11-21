@@ -1,15 +1,8 @@
 ---
-- hosts: db
+- hosts: localhost
   vars:
     db_password: password
   tasks:
-    - name: Copy MariaDB.repo 
-      become: yes
-      copy: src=db/MariaDB.repo dest=/etc/yum.repos.d/MariaDB.repo mode=0644
-
-    - name: Install MariaDB-server
-      become: yes
-      yum: name=MariaDB-server,MariaDB-client update_cache=yes state=present
 
     - name: Turn on MariaDB service
       become: yes
@@ -17,8 +10,7 @@
 
     - name: Transfer Mariadb_answers.txt to /tmp
       template: src=db/mariadb_answers.txt dest=/tmp/mariadb_answers.txt mode=0644
-      
-  
+     
     - name: Execute MySQL Installation
       become: yes
       shell: /usr/bin/mysql_secure_installation </tmp/mariadb_answers.txt

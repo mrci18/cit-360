@@ -10,18 +10,6 @@ variable "aws_region" {
     default = "us-west-2"
 }
 
-#AWS Region for the first instance that will run the web service
-variable "aws_region_us-west-2b" {
-    description = "us-west-2b"
-    default = "us-west-2b"
-}
-
-#AWS Region for the second instance that will run the web service
-variable "aws_region_us-west-2c" {
-    description = "us-west-2b"
-    default = "us-west-2c"
-}
-
 #AMI default 
 variable "amis" {
     description = "AMI"
@@ -80,7 +68,7 @@ resource "aws_nat_gateway" "nat" {
 resource "aws_route_table" "public_routing_table" {
     vpc_id = "${aws_vpc.vpc_test.id}"
     route {
-        cidr_block = "10.31.1.0/24"
+        cidr_block = "0.0.0.0/0"
         gateway_id = "${aws_internet_gateway.gw.id}"
     }
 
@@ -178,24 +166,6 @@ resource "aws_subnet" "private_subnet_c" {
     }
 }
 
-#Create Security Group that allows access from current public IP address to an instance on port22 (SSH)
-resource "aws_security_group" "allow_all" {
-    name = "allow_all"
-    description = "Allow access from current public IP address to an instance on port22 (SSH)"
-
-    ingress {
-        from_port = 0
-        to_port = 22
-        protocol = "tcp"
-	cidr_blocks = [
-		"172.31.0.0/16",
-	]
-    }
-
-    tags {
-        Name = "allow_all"
-    }
-}
 
 #Assciate public_a to public route table
 resource "aws_route_table_association" "public_subnet_a_rt_assoc" {
@@ -234,7 +204,7 @@ resource "aws_route_table_association" "private_subnet_c_rt_assoc" {
 }
 
 #Create DB subnet group
-resource "aws_db_subnet_group" "default" {
+resource "aws_db_subnet_group" "db_subnet_group" {
     name = "main"
     subnet_ids = ["${aws_subnet.private_subnet_a.id}", "${aws_subnet.private_subnet_b.id}"]
     tags {
@@ -243,18 +213,16 @@ resource "aws_db_subnet_group" "default" {
 }
 
 #Create a relational database service (RDS) instance
-resource "aws_db_instance" "default" {
+resource "aws_db_instance" "db_instance" {
     allocated_storage    = 5
     engine               = "mariadb"
     engine_version       = "10.0.24"
     instance_class       = "db.t2.micro"
-    multi_az             = "No"  
     storage_type         = "gp2"
     name                 = "mariadb"
+    identifier           = "mariadb"
     username             = "mrci18"
     password             = "${var.RDS_Key}"
-    db_subnet_group_name = "my_database_subnet_group"
-    parameter_group_name = "default.mariadb10"
 }
 
 #Create a security group with port 80 ingress and port 22 ingress from the cidr network of the VPC
@@ -296,12 +264,7 @@ resource "aws_security_group" "elb_security_group" {
 resource "aws_elb" "elb" {
     name = "foobar-terraform-elb"
     availability_zones = ["us-west-2b", "us-west-2c"]
-
-    access_logs {
-      bucket = "aws_elb"
-      bucket_prefix = "elb"
-      interval = 60
-    }
+    security_groups = ["${aws_security_group.elb_security_group.id}"]
 
     listener {
       instance_port = 80
@@ -318,15 +281,9 @@ resource "aws_elb" "elb" {
       interval = 30
     }
     
-    security_groups = ["${aws_security_group.elb_security_group}"]
 
-    instances = ["${aws_instance.webserver-b.id}"]
-    cross_zone_load_balancing = true
-    idle_timeout = 60
-    connection_draining = true
-    connection_draining_timeout = 60
 
-    instances = ["${aws_instance.webserver-c.id}"]
+    instances = ["${aws_instance.webserver-b.id}", "${aws_instance.webserver-c.id}"]
     cross_zone_load_balancing = true
     idle_timeout = 60
     connection_draining = true
@@ -340,8 +297,9 @@ resource "aws_elb" "elb" {
 #Create first instance that will run the web service
 resource "aws_instance" "webserver-b" {
     ami = "${var.amis}"
-    region = "${var.aws_region_us-west-2b}"
     instance_type = "t2.micro"
+    subnet_id = "${aws_subnet.private_subnet_b.id}"
+    key_name = "cit360"
     tags {
         Name = "webserver-b"
         
@@ -351,9 +309,10 @@ resource "aws_instance" "webserver-b" {
 
 #Create second instance that will run the web service
 resource "aws_instance" "webserver-c" {
-    ami = "${var.amis}"
-    region = "${var.aws_region_us-west-2c}"    
+    ami = "${var.amis}"   
     instance_type = "t2.micro"
+    subnet_id = "${aws_subnet.private_subnet_c.id}"
+    key_name = "cit360"
     tags {
         Name = "webserver-c"
 
