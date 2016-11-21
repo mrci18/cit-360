@@ -249,7 +249,7 @@ resource "aws_security_group" "allow_all" {
 #Create a new security group for the ELB
 resource "aws_security_group" "elb_security_group" {
     name = "elb_security_group"
-    description = "Allow all inbound traffic"
+    vpc_id = "${var.vpc_id}"
 
     ingress {
         from_port = 0
@@ -258,12 +258,19 @@ resource "aws_security_group" "elb_security_group" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = "-1"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
 }
 
 #Create a new elastic load balancer (ELB)
 resource "aws_elb" "elb" {
     name = "foobar-terraform-elb"
-    availability_zones = ["us-west-2b", "us-west-2c"]
+    subnets = ["${aws_subnet.public_subnet_b.id}", "${aws_subnet.public_subnet_c.id}"]
     security_groups = ["${aws_security_group.elb_security_group.id}"]
 
     listener {
