@@ -1,104 +1,89 @@
-#VPC ID to default below
+# Add your VPC ID to default below
 variable "vpc_id" {
-    description = "VPC ID for usage throughout the build process"
-    default = "vpc-a3a841c4"
+  description = "VPC ID for usage throughout the build process"
+  default = "vpc-a3a841c4"
 }
 
-#AWS Region default
-variable "aws_region" {
-    description = "EC2 Region for the VPC"
-    default = "us-west-2"
-}
-
-#AMI default 
 variable "amis" {
     description = "AMI"
     default = "ami-5ec1673e" #Amazon Linux AMI 2016.09.0 HVM (SSD) EBS-Backed 64-bit
 }
 
-#Create instance
+provider "aws" {
+  region = "us-west-2"
+  access_key = "${var.aws_access_key}"
+  secret_key = "${var.aws_secret_key}"
+
+}
+
+#Create bastion instance
 resource "aws_instance" "web" {
     ami = "${var.amis}"
     instance_type = "t2.micro"
+    associate_public_ip_address = true
+    vpc_security_group_ids = ["${aws_security_group.allow_to_22.id}"]
+    subnet_id = "${aws_subnet.public_subnet_a.id}"
     tags {
-        Name = "TestInstance"
+        Name = "web"
     }
 }
 
-#Configure the AWS provider
-provider "aws" {
-    region = "${var.aws_region}"
-    access_key = "${var.aws_access_key}"
-    secret_key = "${var.aws_secret_key}"
-}
-
-#Create VPC
-resource "aws_vpc" "vpc_test" {
-    cidr_block = "172.31.0.0/16"
-    enable_dns_support = true
-    enable_dns_hostnames = true
-    tags = {
-        Name = "vpc_test"
-    }
-}
-
-#Create Internet Gateway
+#Create a single Internet Gateway that will be placed in public route table for public subnets
 resource "aws_internet_gateway" "gw" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
+  vpc_id = "${var.vpc_id}"
 
-    tags {
-      Name = "InternetGateWay"
-    }
+  tags = {
+    Name = "gw"
+  }
 }
 
-#Create EIP to assign in NAT Gateway
+#Create Elastic IP to assign in NAT Gateway
 resource "aws_eip" "eip" {
     vpc = true
     depends_on = ["aws_internet_gateway.gw"]
 }
 
-#Create NAT Gateway
+
+#Create a single NAT Gateway in any region that will be placed in the private route table for private subnets
 resource "aws_nat_gateway" "nat" {
     allocation_id = "${aws_eip.eip.id}"
     subnet_id = "${aws_subnet.private_subnet_a.id}"
     depends_on = ["aws_internet_gateway.gw"]
 }
 
-#Create Public Routing Table
+#Create a public route table. This route table will have the Internet Gateway in the default route and will be used by the public subnets
 resource "aws_route_table" "public_routing_table" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = "${aws_internet_gateway.gw.id}"
-    }
+  vpc_id = "${var.vpc_id}"
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.gw.id}"
+  }
 
-    tags {
-        Name = "public_routing_table"
+  tags {
+    Name = "public_routing_table"
   }
 }
 
-#Create A Private Route Table
-
+#Create a private route table. This route table will have the NAT Gateway in the default route and will be used by the private subnets.
 resource "aws_route_table" "private_routing_table" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
-  
+    vpc_id = "${var.vpc_id}"
+
     tags {
         Name = "private_routing_table"
-  }
+    }
 }
 
-#This route table will have the NAT Gateway in the default route and will be used by the private subnets.
-
-resource "aws_route" "private" {
-    route_table_id = "${aws_route_table.private_routing_table.id}"
-    destination_cidr_block = "0.0.0.0/0"
-    nat_gateway_id = "${aws_nat_gateway.nat.id}"
+#Part of private route table
+resource "aws_route" "private_route" {
+	route_table_id  = "${aws_route_table.private_routing_table.id}"
+	destination_cidr_block = "0.0.0.0/0"
+	nat_gateway_id = "${aws_nat_gateway.nat.id}"
 }
 
 #Create public subnet us-west-2a
 resource "aws_subnet" "public_subnet_a" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
-    cidr_block = "172.31.1.0/24"
+    vpc_id = "${var.vpc_id}"
+    cidr_block = "172.31.4.0/24"
     map_public_ip_on_launch = true
     availability_zone = "us-west-2a"
 
@@ -109,7 +94,7 @@ resource "aws_subnet" "public_subnet_a" {
 
 #Create public subnet us-west-2b
 resource "aws_subnet" "public_subnet_b" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
+    vpc_id = "${var.vpc_id}"
     cidr_block = "172.31.2.0/24"
     map_public_ip_on_launch = true
     availability_zone = "us-west-2b"
@@ -121,7 +106,7 @@ resource "aws_subnet" "public_subnet_b" {
 
 #Create public subnet us-west-2c
 resource "aws_subnet" "public_subnet_c" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
+    vpc_id = "${var.vpc_id}"
     cidr_block = "172.31.3.0/24"
     map_public_ip_on_launch = true
     availability_zone = "us-west-2c"
@@ -132,11 +117,9 @@ resource "aws_subnet" "public_subnet_c" {
 }
 
 #Create private subnet us-west-2a
-#Public subnets should /22 inside VPR CIDR space
-#Private subnet uses NAT Gateway in its routing table for the default route
 resource "aws_subnet" "private_subnet_a" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
-    cidr_block = "172.31.5.0/22"
+    vpc_id = "${var.vpc_id}"
+    cidr_block = "172.31.16.0/22"
     availability_zone = "us-west-2a"
 
     tags {
@@ -146,18 +129,18 @@ resource "aws_subnet" "private_subnet_a" {
 
 #Create private subnet us-west-2b
 resource "aws_subnet" "private_subnet_b" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
+    vpc_id = "${var.vpc_id}"
     cidr_block = "172.31.8.0/22"
     availability_zone = "us-west-2b"
 
     tags {
-        Name = "private_b"
+        Name = "private_a"
     }
 }
 
 #Create private subnet us-west-2c
 resource "aws_subnet" "private_subnet_c" {
-    vpc_id = "${aws_vpc.vpc_test.id}"
+    vpc_id = "${var.vpc_id}"
     cidr_block = "172.31.12.0/22"
     availability_zone = "us-west-2c"
 
@@ -166,49 +149,40 @@ resource "aws_subnet" "private_subnet_c" {
     }
 }
 
+#Create a security group that allows access from your current public IP address to an instance on port 22 (SSH)
+resource "aws_security_group" "allow_to_22" {
+  name = "allow_to_22"
+  description = "Allow all inbound traffic"
 
-#Assciate public_a to public route table
-resource "aws_route_table_association" "public_subnet_a_rt_assoc" {
-    subnet_id = "${aws_subnet.public_subnet_a.id}"
-    route_table_id = "${aws_route_table.public_routing_table.id}"
+  ingress {
+      from_port = 0
+      to_port = 22
+      protocol = "tcp"
+      cidr_blocks = ["172.31.0.0/16"]
+  }
+
 }
 
-#Assciate public_b to public route table
-resource "aws_route_table_association" "public_subnet_b_rt_assoc" {
-    subnet_id = "${aws_subnet.public_subnet_b.id}"
-    route_table_id = "${aws_route_table.public_routing_table.id}"
+#Create security group for DB
+resource "aws_security_group" "db_security_group" {
+  name = "db_security_group"
+  description = "Security group for DB"
+
+  ingress {
+      from_port = 0
+      to_port = 0
+      protocol = "-1"
+      cidr_blocks = ["172.31.0.0/16"]
+  }
+
 }
 
-#Assciate public_c to public route table
-resource "aws_route_table_association" "public_subnet_c_rt_assoc" {
-    subnet_id = "${aws_subnet.public_subnet_c.id}"
-    route_table_id = "${aws_route_table.public_routing_table.id}"
-}
-
-#Assciate private_a to private route table
-resource "aws_route_table_association" "private_subnet_a_rt_assoc" {
-    subnet_id = "${aws_subnet.private_subnet_a.id}"
-    route_table_id = "${aws_route_table.private_routing_table.id}"
-}
-
-#Assciate private_b to private route table
-resource "aws_route_table_association" "private_subnet_b_rt_assoc" {
-    subnet_id = "${aws_subnet.private_subnet_b.id}"
-    route_table_id = "${aws_route_table.private_routing_table.id}"
-}
-
-#Assciate private_c to private route table
-resource "aws_route_table_association" "private_subnet_c_rt_assoc" {
-    subnet_id = "${aws_subnet.private_subnet_c.id}"
-    route_table_id = "${aws_route_table.private_routing_table.id}"
-}
-
-#Create DB subnet group
+#Create a subnet group for DB 
 resource "aws_db_subnet_group" "db_subnet_group" {
-    name = "main"
+    name = "db_subnet_group"
     subnet_ids = ["${aws_subnet.private_subnet_a.id}", "${aws_subnet.private_subnet_b.id}"]
     tags {
-        Name = "My DB subnet group"
+        Name = "db_subnet_group"
     }
 }
 
@@ -223,11 +197,12 @@ resource "aws_db_instance" "db_instance" {
     identifier           = "mariadb"
     username             = "mrci18"
     password             = "${var.RDS_Key}"
+    db_subnet_group_name = "${aws_db_subnet_group.db_subnet_group.id}"
 }
 
 #Create a security group with port 80 ingress and port 22 ingress from the cidr network of the VPC
-resource "aws_security_group" "allow_all" {
-    name = "allow_all"
+resource "aws_security_group" "security_group_80_20" {
+    name = "security_group_80_20"
     description = "Allow all inbound traffic"
 
     ingress {
@@ -249,19 +224,11 @@ resource "aws_security_group" "allow_all" {
 #Create a new security group for the ELB
 resource "aws_security_group" "elb_security_group" {
     name = "elb_security_group"
-    vpc_id = "${var.vpc_id}"
 
     ingress {
         from_port = 0
         to_port = 80
         protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
         cidr_blocks = ["0.0.0.0/0"]
     }
 
@@ -288,8 +255,6 @@ resource "aws_elb" "elb" {
       interval = 30
     }
     
-
-
     instances = ["${aws_instance.webserver-b.id}", "${aws_instance.webserver-c.id}"]
     cross_zone_load_balancing = true
     idle_timeout = 60
@@ -327,20 +292,38 @@ resource "aws_instance" "webserver-c" {
     }
 }
 
+#Assciate public_a to public route table
+resource "aws_route_table_association" "public_subnet_a_rt_assoc" {
+    subnet_id = "${aws_subnet.public_subnet_a.id}"
+    route_table_id = "${aws_route_table.public_routing_table.id}"
+}
 
+#Assciate public_b to public route table
+resource "aws_route_table_association" "public_subnet_b_rt_assoc" {
+    subnet_id = "${aws_subnet.public_subnet_b.id}"
+    route_table_id = "${aws_route_table.public_routing_table.id}"
+}
 
+#Assciate public_c to public route table
+resource "aws_route_table_association" "public_subnet_c_rt_assoc" {
+    subnet_id = "${aws_subnet.public_subnet_c.id}"
+    route_table_id = "${aws_route_table.public_routing_table.id}"
+}
 
+#Assciate private_a to private route table
+resource "aws_route_table_association" "private_subnet_a_rt_assoc" {
+    subnet_id = "${aws_subnet.private_subnet_a.id}"
+    route_table_id = "${aws_route_table.private_routing_table.id}"
+}
 
+#Assciate private_b to private route table
+resource "aws_route_table_association" "private_subnet_b_rt_assoc" {
+    subnet_id = "${aws_subnet.private_subnet_b.id}"
+    route_table_id = "${aws_route_table.private_routing_table.id}"
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
+#Assciate private_c to private route table
+resource "aws_route_table_association" "private_subnet_c_rt_assoc" {
+    subnet_id = "${aws_subnet.private_subnet_c.id}"
+    route_table_id = "${aws_route_table.private_routing_table.id}"
+}
