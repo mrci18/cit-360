@@ -9,7 +9,7 @@
      
     - name: Execute MySQL Installation
       become: yes
-      shell: /usr/bin/mysql_secure_installation </tmp/mariadb_answers.txt
+      shell: /usr/bin/mysql_secure_installation < /tmp/mariadb_answers.txt
       
     - name: Unpack db.tgz
       unarchive: src=db/db.tgz dest=~/ mode=0755
