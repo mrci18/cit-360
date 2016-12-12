@@ -4,10 +4,6 @@
     db_password: password
   tasks:
 
-    - name: Turn on MariaDB service
-      become: yes
-      service: name=mariadb state=started enabled=yes
-
     - name: Transfer Mariadb_answers.txt to /tmp
       template: src=db/mariadb_answers.txt dest=/tmp/mariadb_answers.txt mode=0644
      
