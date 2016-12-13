@@ -3,13 +3,13 @@
   vars:
     db_password: password
   tasks:
-
-    - name: Transfer Mariadb_answers.txt to /tmp
-      template: src=db/mariadb_answers.txt dest=/tmp/mariadb_answers.txt mode=0644
-     
-    - name: Execute MySQL Installation
+    - name: Copy MariaDB.repo 
       become: yes
-      shell: /usr/bin/mysql_secure_installation >> /tmp/mariadb_answers.txt
+      copy: src=db/MariaDB.repo dest=/etc/yum.repos.d/MariaDB.repo mode=0644
+
+    - name: Turn on MariaDB service
+      become: yes
+      service: name=mariadb state=started enabled=yes
       
     - name: Unpack db.tgz
       unarchive: src=db/db.tgz dest=~/ mode=0755
@@ -18,4 +18,3 @@
     - name: Show errors
       command: ./make_databases.sh {{ db_password }} localhost chdir=~/db
       ignore_errors: True
-
