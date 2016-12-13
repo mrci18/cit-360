@@ -210,8 +210,8 @@ resource "aws_db_instance" "db_instance" {
 }
 
 #Create a security group with port 80 ingress and port 22 ingress from the cidr network of the VPC
-resource "aws_security_group" "security_group_80_20" {
-    name = "security_group_80_20"
+resource "aws_security_group" "security_group_80_22" {
+    name = "security_group_80_22"
     description = "Allow all inbound traffic"
 
     ingress {
@@ -280,6 +280,7 @@ resource "aws_instance" "webserver-b" {
     ami = "${var.amis}"
     instance_type = "t2.micro"
     subnet_id = "${aws_subnet.private_subnet_b.id}"
+    vpc_security_group_ids = ["${aws_security_group.security_group_80_22.id}"]
     key_name = "cit360"
     tags {
         Name = "webserver-b"
@@ -293,6 +294,7 @@ resource "aws_instance" "webserver-c" {
     ami = "${var.amis}"   
     instance_type = "t2.micro"
     subnet_id = "${aws_subnet.private_subnet_c.id}"
+    vpc_security_group_ids = ["${aws_security_group.security_group_80_22.id}"]
     key_name = "cit360"
     tags {
         Name = "webserver-c"
