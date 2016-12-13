@@ -10,10 +10,6 @@
     - name: Install MariaDB-client
       become: yes
       yum: name=MariaDB-client update_cache=yes state=present
-
-    - name: Turn on MariaDB service
-      become: yes
-      service: name=mariadb state=started enabled=yes
       
     - name: Copying db.tgz and creating a directory 
       unarchive: src=db/db.tgz dest=~/ mode=0755
