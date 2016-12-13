@@ -7,26 +7,17 @@
       become: yes
       copy: src=db/MariaDB.repo dest=/etc/yum.repos.d/MariaDB.repo mode=0644
 
-    - name: Install MariaDB-server
+    - name: Install MariaDB-client
       become: yes
-      yum: name=MariaDB-server,MariaDB-client update_cache=yes state=present
+      yum: name=MariaDB-client update_cache=yes state=present
 
     - name: Turn on MariaDB service
       become: yes
       service: name=mariadb state=started enabled=yes
-
-    - name: Transfer Mariadb_answers.txt to /tmp
-      template: src=db/mariadb_answers.txt dest=/tmp/mariadb_answers.txt mode=0644
       
-  
-    - name: Execute MySQL Installation
-      become: yes
-      shell: /usr/bin/mysql_secure_installation </tmp/mariadb_answers.txt
-      
-    - name: Unpack db.tgz
+    - name: Copying db.tgz and creating a directory 
       unarchive: src=db/db.tgz dest=~/ mode=0755
-      #Copying db.tgz and creating a directory 
 
-    - name: Show errors
-      command: ./make_databases.sh {{ db_password }} localhost chdir=~/db
+    - name: Make database for RDS
+      command: ./make_databases.sh {{ db_password }} mariadb.ckb2fibwtqu4.us-west-2.rds.amazonaws.com
       ignore_errors: True
